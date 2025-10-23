@@ -1,12 +1,9 @@
 package com.saki.gestion_stock.services.Impl;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.stream.Collectors;
-
 import com.saki.gestion_stock.dto.MvtStkDto;
 import com.saki.gestion_stock.exception.ErrorCodes;
 import com.saki.gestion_stock.exception.InvalidEntityException;
+import com.saki.gestion_stock.exception.InvalidOperationException;
 import com.saki.gestion_stock.model.TypeMvtStk;
 import com.saki.gestion_stock.repository.MvtStkRepository;
 import com.saki.gestion_stock.services.ArticleService;
@@ -15,6 +12,11 @@ import com.saki.gestion_stock.validator.MvtStkValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -78,6 +80,7 @@ public class MvtStkServiceImpl implements MvtStkService {
                 )
         );
         dto.setTypeMvt(typeMvtStk);
+        dto.setDateMvt(Instant.now());
         return MvtStkDto.fromEntity(
                 repository.save(MvtStkDto.toEntity(dto))
         );
@@ -89,12 +92,25 @@ public class MvtStkServiceImpl implements MvtStkService {
             log.error("Article is not valid {}", dto);
             throw new InvalidEntityException("Le mouvement du stock n'est pas valide", ErrorCodes.MVT_STK_NOT_VALID, errors);
         }
+
+        // Vérification du stock avant sortie
+        BigDecimal stockActuel = stockReelArticle(dto.getArticle().getId());
+        BigDecimal quantiteDemandee = dto.getQuantite().abs();
+
+        if (stockActuel == null || stockActuel.compareTo(quantiteDemandee) < 0) {
+            throw new InvalidOperationException(
+                    "Stock insuffisant. Stock actuel: " + stockActuel + ", Quantité demandée: " + quantiteDemandee,
+                    ErrorCodes.STOCK_INSUFFISANT
+            );
+        }
+
         dto.setQuantite(
                 BigDecimal.valueOf(
                         Math.abs(dto.getQuantite().doubleValue()) * -1
                 )
         );
         dto.setTypeMvt(typeMvtStk);
+        dto.setDateMvt(Instant.now());
         return MvtStkDto.fromEntity(
                 repository.save(MvtStkDto.toEntity(dto))
         );

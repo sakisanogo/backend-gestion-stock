@@ -15,13 +15,13 @@ public class InvalidOperationException extends RuntimeException {
         super(message, cause);
     }
 
-    public InvalidOperationException(String message, Throwable cause, ErrorCodes errorCode) {
-        super(message, cause);
+    public InvalidOperationException(String message, ErrorCodes errorCode) {
+        super(message);
         this.errorCode = errorCode;
     }
 
-    public InvalidOperationException(String message, ErrorCodes errorCode) {
-        super(message);
+    public InvalidOperationException(String message, ErrorCodes errorCode, Throwable cause) {
+        super(message, cause);
         this.errorCode = errorCode;
     }
 }

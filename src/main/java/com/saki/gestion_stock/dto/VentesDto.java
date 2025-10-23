@@ -29,6 +29,7 @@ public class VentesDto {
         return VentesDto.builder()
                 .id(vente.getId())
                 .code(vente.getCode())
+                .dateVente(vente.getDateVente()) // ← CORRECTION AJOUTÉE ICI
                 .commentaire(vente.getCommentaire())
                 .idEntreprise(vente.getIdEntreprise())
                 .build();
@@ -40,7 +41,8 @@ public class VentesDto {
         }
         Ventes ventes = new Ventes();
         ventes.setId(dto.getId());
-        ventes.setCode(ventes.getCode());
+        ventes.setCode(dto.getCode());
+        ventes.setDateVente(dto.getDateVente());
         ventes.setCommentaire(dto.getCommentaire());
         ventes.setIdEntreprise(dto.getIdEntreprise());
         return ventes;
