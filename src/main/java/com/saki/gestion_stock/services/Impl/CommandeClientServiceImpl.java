@@ -27,16 +27,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+// Service d'implémentation pour la gestion des commandes clients
+// @Slf4j génère automatiquement un logger SLF4J
 @Service
 @Slf4j
 public class CommandeClientServiceImpl implements CommandeClientService {
 
+    // Injection des repositories et services nécessaires
     private CommandeClientRepository commandeClientRepository;
     private LigneCommandeClientRepository ligneCommandeClientRepository;
     private ClientRepository clientRepository;
     private ArticleRepository articleRepository;
-    private MvtStkService mvtStkService;
+    private MvtStkService mvtStkService; // Service pour gérer les mouvements de stock
 
+    // Constructeur avec injection de dépendances
     @Autowired
     public CommandeClientServiceImpl(CommandeClientRepository commandeClientRepository,
                                      ClientRepository clientRepository, ArticleRepository articleRepository,
@@ -49,6 +53,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         this.mvtStkService = mvtStkService;
     }
 
+    // Sauvegarde d'une nouvelle commande client avec validation complète
     @Override
     public CommandeClientDto save(CommandeClientDto dto) {
         log.info("Début de sauvegarde de commande client");
@@ -60,6 +65,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
             throw new InvalidEntityException("La commande client n'est pas valide", ErrorCodes.COMMANDE_CLIENT_NOT_VALID, errors);
         }
 
+        // Vérification qu'on ne modifie pas une commande déjà livrée
         if (dto.getId() != null && dto.isCommandeLivree()) {
             throw new InvalidOperationException("Impossible de modifier la commande lorsqu'elle est livree", ErrorCodes.COMMANDE_CLIENT_NON_MODIFIABLE);
         }
@@ -111,6 +117,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
             throw new InvalidEntityException("Erreur de validation des articles", ErrorCodes.ARTICLE_NOT_FOUND, articleErrors);
         }
 
+        // Définition de la date de commande et sauvegarde
         dto.setDateCommande(Instant.now());
         CommandeClient savedCmdClt = commandeClientRepository.save(CommandeClientDto.toEntity(dto));
 
@@ -131,7 +138,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
                 }
 
                 LigneCommandeClient savedLigneCmd = ligneCommandeClientRepository.save(ligneCommandeClient);
-                effectuerSortie(savedLigneCmd);
+                effectuerSortie(savedLigneCmd); // Effectue la sortie de stock
             });
         }
 
@@ -139,6 +146,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         return CommandeClientDto.fromEntity(savedCmdClt);
     }
 
+    // Recherche d'une commande client par son ID
     @Override
     public CommandeClientDto findById(Integer id) {
         if (id == null) {
@@ -152,6 +160,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
                 ));
     }
 
+    // Recherche d'une commande client par son code
     @Override
     public CommandeClientDto findByCode(String code) {
         if (!StringUtils.hasLength(code)) {
@@ -165,6 +174,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
                 ));
     }
 
+    // Récupération de toutes les commandes clients
     @Override
     public List<CommandeClientDto> findAll() {
         return commandeClientRepository.findAll().stream()
@@ -172,6 +182,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
                 .collect(Collectors.toList());
     }
 
+    // Suppression d'une commande client avec ses lignes
     @Override
     @Transactional
     public void delete(Integer id) {
@@ -199,6 +210,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         log.info("✅ Commande client supprimée avec succès, ID: {}", id);
     }
 
+    // Récupération de toutes les lignes d'une commande client
     @Override
     public List<LigneCommandeClientDto> findAllLignesCommandesClientByCommandeClientId(Integer idCommande) {
         if (idCommande == null) {
@@ -210,6 +222,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
                 .collect(Collectors.toList());
     }
 
+    // Mise à jour de l'état d'une commande client
     @Override
     public CommandeClientDto updateEtatCommande(Integer idCommande, EtatCommande etatCommande) {
         checkIdCommande(idCommande);
@@ -223,13 +236,14 @@ public class CommandeClientServiceImpl implements CommandeClientService {
 
         CommandeClient savedCmdClt = commandeClientRepository.save(CommandeClientDto.toEntity(commandeClient));
         if (commandeClient.isCommandeLivree()) {
-            updateMvtStk(idCommande);
+            updateMvtStk(idCommande); // Met à jour les mouvements de stock si la commande est livrée
         }
 
         log.info("État de la commande mis à jour: ID {}, Nouvel état: {}", idCommande, etatCommande);
         return CommandeClientDto.fromEntity(savedCmdClt);
     }
 
+    // Mise à jour de la quantité d'une ligne de commande
     @Override
     public CommandeClientDto updateQuantiteCommande(Integer idCommande, Integer idLigneCommande, BigDecimal quantite) {
         checkIdCommande(idCommande);
@@ -253,6 +267,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         return commandeClient;
     }
 
+    // Mise à jour du client d'une commande
     @Override
     public CommandeClientDto updateClient(Integer idCommande, Integer idClient) {
         checkIdCommande(idCommande);
@@ -274,6 +289,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         return CommandeClientDto.fromEntity(savedCmdClt);
     }
 
+    // Mise à jour de l'article d'une ligne de commande
     @Override
     public CommandeClientDto updateArticle(Integer idCommande, Integer idLigneCommande, Integer idArticle) {
         checkIdCommande(idCommande);
@@ -304,6 +320,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         return commandeClient;
     }
 
+    // Suppression d'un article d'une commande
     @Override
     public CommandeClientDto deleteArticle(Integer idCommande, Integer idLigneCommande) {
         checkIdCommande(idCommande);
@@ -318,6 +335,9 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         return commandeClient;
     }
 
+    // ============ MÉTHODES PRIVÉES ============
+
+    // Vérifie qu'une commande n'est pas livrée (sinon non modifiable)
     private CommandeClientDto checkEtatCommande(Integer idCommande) {
         CommandeClientDto commandeClient = findById(idCommande);
         if (commandeClient.isCommandeLivree()) {
@@ -326,6 +346,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         return commandeClient;
     }
 
+    // Recherche une ligne de commande par son ID
     private Optional<LigneCommandeClient> findLigneCommandeClient(Integer idLigneCommande) {
         Optional<LigneCommandeClient> ligneCommandeClientOptional = ligneCommandeClientRepository.findById(idLigneCommande);
         if (ligneCommandeClientOptional.isEmpty()) {
@@ -335,6 +356,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         return ligneCommandeClientOptional;
     }
 
+    // Méthodes de validation des IDs
     private void checkIdCommande(Integer idCommande) {
         if (idCommande == null) {
             log.error("Commande client ID is NULL");
@@ -359,6 +381,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         }
     }
 
+    // Met à jour les mouvements de stock pour une commande livrée
     private void updateMvtStk(Integer idCommande) {
         List<LigneCommandeClient> ligneCommandeClients = ligneCommandeClientRepository.findAllByCommandeClientId(idCommande);
         ligneCommandeClients.forEach(lig -> {
@@ -367,6 +390,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
         log.info("Mouvements de stock mis à jour pour la commande ID: {}", idCommande);
     }
 
+    // Effectue une sortie de stock pour une ligne de commande
     private void effectuerSortie(LigneCommandeClient lig) {
         if (lig.getArticle() == null) {
             log.error("Impossible d'effectuer la sortie: l'article est null pour la ligne de commande ID: {}", lig.getId());
@@ -374,6 +398,7 @@ public class CommandeClientServiceImpl implements CommandeClientService {
                     ErrorCodes.COMMANDE_CLIENT_NON_MODIFIABLE);
         }
 
+        // Création du mouvement de stock de sortie
         MvtStkDto mvtStkDto = MvtStkDto.builder()
                 .article(ArticleDto.fromEntity(lig.getArticle()))
                 .dateMvt(Instant.now())

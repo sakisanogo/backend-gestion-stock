@@ -21,12 +21,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+// Service d'implémentation pour la gestion des utilisateurs
+// Service critique pour la sécurité et l'authentification
 @Service
 @Slf4j
 public class UtilisateurServiceImpl implements UtilisateurService {
 
     private UtilisateurRepository utilisateurRepository;
-    private PasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder; // Encodeur de mots de passe Spring Security
 
     @Autowired
     public UtilisateurServiceImpl(UtilisateurRepository utilisateurRepository,
@@ -35,6 +37,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // Sauvegarde d'un nouvel utilisateur avec validation et sécurité
     @Override
     public UtilisateurDto save(UtilisateurDto dto) {
         List<String> errors = UtilisateurValidator.validate(dto);
@@ -43,12 +46,13 @@ public class UtilisateurServiceImpl implements UtilisateurService {
             throw new InvalidEntityException("L'utilisateur n'est pas valide", ErrorCodes.UTILISATEUR_NOT_VALID, errors);
         }
 
+        // Vérification de l'unicité de l'email
         if(userAlreadyExists(dto.getEmail())) {
             throw new InvalidEntityException("Un autre utilisateur avec le meme email existe deja", ErrorCodes.UTILISATEUR_ALREADY_EXISTS,
                     Collections.singletonList("Un autre utilisateur avec le meme email existe deja dans la BDD"));
         }
 
-
+        // HACHAGE CRITIQUE du mot de passe avant sauvegarde
         dto.setMoteDePasse(passwordEncoder.encode(dto.getMoteDePasse()));
 
         return UtilisateurDto.fromEntity(
@@ -58,11 +62,13 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         );
     }
 
+    // Vérifie si un utilisateur existe déjà avec cet email
     private boolean userAlreadyExists(String email) {
         Optional<Utilisateur> user = utilisateurRepository.findUtilisateurByEmail(email);
         return user.isPresent();
     }
 
+    // Recherche d'un utilisateur par son ID
     @Override
     public UtilisateurDto findById(Integer id) {
         if (id == null) {
@@ -77,6 +83,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
                 );
     }
 
+    // Récupération de tous les utilisateurs
     @Override
     public List<UtilisateurDto> findAll() {
         return utilisateurRepository.findAll().stream()
@@ -84,6 +91,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
                 .collect(Collectors.toList());
     }
 
+    // Suppression d'un utilisateur
     @Override
     public void delete(Integer id) {
         if (id == null) {
@@ -93,6 +101,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         utilisateurRepository.deleteById(id);
     }
 
+    // Recherche d'un utilisateur par son email (utilisé pour l'authentification)
     @Override
     public UtilisateurDto findByEmail(String email) {
         return utilisateurRepository.findUtilisateurByEmail(email)
@@ -103,9 +112,10 @@ public class UtilisateurServiceImpl implements UtilisateurService {
                 );
     }
 
+    // Changement de mot de passe avec validation sécurisée
     @Override
     public UtilisateurDto changerMotDePasse(ChangerMotDePasseUtilisateurDto dto) {
-        validate(dto);
+        validate(dto); // Validation des données de changement
         Optional<Utilisateur> utilisateurOptional = utilisateurRepository.findById(dto.getId());
         if (utilisateurOptional.isEmpty()) {
             log.warn("Aucun utilisateur n'a ete trouve avec l'ID " + dto.getId());
@@ -113,6 +123,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         }
 
         Utilisateur utilisateur = utilisateurOptional.get();
+        // Hachage du nouveau mot de passe
         utilisateur.setMoteDePasse(passwordEncoder.encode(dto.getMotDePasse()));
 
         return UtilisateurDto.fromEntity(
@@ -120,6 +131,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         );
     }
 
+    // Validation sécurisée des données de changement de mot de passe
     private void validate(ChangerMotDePasseUtilisateurDto dto) {
         if (dto == null) {
             log.warn("Impossible de modifier le mot de passe avec un objet NULL");
@@ -136,6 +148,7 @@ public class UtilisateurServiceImpl implements UtilisateurService {
             throw new InvalidOperationException("Mot de passe utilisateur null:: Impossible de modifier le mote de passe",
                     ErrorCodes.UTILISATEUR_CHANGE_PASSWORD_OBJECT_NOT_VALID);
         }
+        // Vérification que les deux mots de passe saisis sont identiques
         if (!dto.getMotDePasse().equals(dto.getConfirmMotDePasse())) {
             log.warn("Impossible de modifier le mot de passe avec deux mots de passe different");
             throw new InvalidOperationException("Mots de passe utilisateur non conformes:: Impossible de modifier le mote de passe",

@@ -27,10 +27,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+// Service d'implémentation pour la gestion des catégories d'articles
+// @Slf4j génère automatiquement un logger SLF4J
 @Service
 @Slf4j
 public class CategoryServiceImpl implements CategoryService {
 
+    // Injection des repositories nécessaires pour gérer les catégories et leurs dépendances
     private CategoryRepository categoryRepository;
     private ArticleRepository articleRepository;
     private LigneCommandeClientRepository ligneCommandeClientRepository;
@@ -38,6 +41,7 @@ public class CategoryServiceImpl implements CategoryService {
     private LigneVenteRepository ligneVenteRepository;
     private MvtStkRepository mvtStkRepository;
 
+    // Constructeur avec injection de toutes les dépendances nécessaires
     @Autowired
     public CategoryServiceImpl(
             CategoryRepository categoryRepository,
@@ -54,6 +58,7 @@ public class CategoryServiceImpl implements CategoryService {
         this.mvtStkRepository = mvtStkRepository;
     }
 
+    // Sauvegarde d'une nouvelle catégorie avec validation
     @Override
     public CategoryDto save(CategoryDto dto) {
         List<String> errors = CategoryValidator.validate(dto);
@@ -61,11 +66,13 @@ public class CategoryServiceImpl implements CategoryService {
             log.error("Category is not valid {}", dto);
             throw new InvalidEntityException("La category n'est pas valide", ErrorCodes.CATEGORY_NOT_VALID, errors);
         }
+        // Conversion DTO -> Entity, sauvegarde, puis conversion Entity -> DTO
         return CategoryDto.fromEntity(
                 categoryRepository.save(CategoryDto.toEntity(dto))
         );
     }
 
+    // Recherche d'une catégorie par son ID
     @Override
     public CategoryDto findById(Integer id) {
         if (id == null) {
@@ -80,6 +87,7 @@ public class CategoryServiceImpl implements CategoryService {
                 );
     }
 
+    // Recherche d'une catégorie par son code
     @Override
     public CategoryDto findByCode(String code) {
         if (!StringUtils.hasLength(code)) {
@@ -94,6 +102,7 @@ public class CategoryServiceImpl implements CategoryService {
                 );
     }
 
+    // Récupération de toutes les catégories
     @Override
     public List<CategoryDto> findAll() {
         return categoryRepository.findAll().stream()
@@ -101,6 +110,8 @@ public class CategoryServiceImpl implements CategoryService {
                 .collect(Collectors.toList());
     }
 
+    // Suppression en cascade d'une catégorie et de tous ses articles avec leurs dépendances
+    // @Transactional assure que toutes les opérations sont atomiques (tout ou rien)
     @Override
     @Transactional
     public void delete(Integer id) {
@@ -109,7 +120,7 @@ public class CategoryServiceImpl implements CategoryService {
             return;
         }
 
-        // Vérifier si la catégorie existe
+        // Vérifier si la catégorie existe (lève une exception si non trouvée)
         findById(id);
 
         log.info("Tentative de suppression de la catégorie ID: {}", id);
@@ -120,11 +131,11 @@ public class CategoryServiceImpl implements CategoryService {
         if (!articles.isEmpty()) {
             log.info("Suppression de {} articles pour la catégorie ID: {}", articles.size(), id);
 
-            // Pour chaque article, supprimer toutes les dépendances
+            // Pour chaque article, supprimer toutes les dépendances en cascade
             for (Article article : articles) {
                 Integer articleId = article.getId();
 
-                // 1. Supprimer les mouvements de stock
+                // 1. Supprimer les mouvements de stock (données techniques)
                 List<MvtStk> mouvementsStock = mvtStkRepository.findAllByArticleId(articleId);
                 if (!mouvementsStock.isEmpty()) {
                     log.info("Suppression de {} mouvements de stock pour l'article ID: {}", mouvementsStock.size(), articleId);
@@ -152,7 +163,7 @@ public class CategoryServiceImpl implements CategoryService {
                     ligneVenteRepository.deleteAll(ligneVentes);
                 }
 
-                // 5. Supprimer l'article
+                // 5. Supprimer l'article lui-même après avoir nettoyé toutes ses dépendances
                 articleRepository.delete(article);
                 log.info("Article ID: {} supprimé", articleId);
             }
@@ -160,7 +171,7 @@ public class CategoryServiceImpl implements CategoryService {
             log.info("Tous les articles et leurs dépendances ont été supprimés pour la catégorie ID: {}", id);
         }
 
-        // Maintenant supprimer la catégorie
+        // Maintenant supprimer la catégorie elle-même (tous ses articles ont été supprimés)
         categoryRepository.deleteById(id);
         log.info("Catégorie ID: {} supprimée avec succès", id);
     }

@@ -28,16 +28,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+// Service d'implémentation pour la gestion des articles
+// @Slf4j génère automatiquement un logger SLF4J
 @Service
 @Slf4j
 public class ArticleServiceImpl implements ArticleService {
 
+    // Injection des repositories nécessaires pour les opérations sur les articles et leurs dépendances
     private ArticleRepository articleRepository;
     private LigneVenteRepository venteRepository;
     private LigneCommandeFournisseurRepository commandeFournisseurRepository;
     private LigneCommandeClientRepository commandeClientRepository;
-    private MvtStkRepository mvtStkRepository; // Ajout du repository pour les mouvements de stock
+    private MvtStkRepository mvtStkRepository; // Repository pour les mouvements de stock
 
+    // Constructeur avec injection de dépendances
     @Autowired
     public ArticleServiceImpl(
             ArticleRepository articleRepository,
@@ -52,6 +56,7 @@ public class ArticleServiceImpl implements ArticleService {
         this.mvtStkRepository = mvtStkRepository;
     }
 
+    // Sauvegarde d'un nouvel article avec validation
     @Override
     public ArticleDto save(ArticleDto dto) {
         List<String> errors = ArticleValidator.validate(dto);
@@ -60,6 +65,7 @@ public class ArticleServiceImpl implements ArticleService {
             throw new InvalidEntityException("L'article n'est pas valide", ErrorCodes.ARTICLE_NOT_VALID, errors);
         }
 
+        // Conversion DTO -> Entity, sauvegarde, puis conversion Entity -> DTO
         return ArticleDto.fromEntity(
                 articleRepository.save(
                         ArticleDto.toEntity(dto)
@@ -67,6 +73,7 @@ public class ArticleServiceImpl implements ArticleService {
         );
     }
 
+    // Recherche d'un article par son ID
     @Override
     public ArticleDto findById(Integer id) {
         if (id == null) {
@@ -81,6 +88,7 @@ public class ArticleServiceImpl implements ArticleService {
         );
     }
 
+    // Recherche d'un article par son code article
     @Override
     public ArticleDto findByCodeArticle(String codeArticle) {
         if (!StringUtils.hasLength(codeArticle)) {
@@ -97,6 +105,7 @@ public class ArticleServiceImpl implements ArticleService {
                 );
     }
 
+    // Récupération de tous les articles
     @Override
     public List<ArticleDto> findAll() {
         return articleRepository.findAll().stream()
@@ -104,6 +113,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .collect(Collectors.toList());
     }
 
+    // Historique des ventes pour un article spécifique
     @Override
     public List<LigneVenteDto> findHistoriqueVentes(Integer idArticle) {
         return venteRepository.findAllByArticleId(idArticle).stream()
@@ -111,6 +121,8 @@ public class ArticleServiceImpl implements ArticleService {
                 .collect(Collectors.toList());
     }
 
+    // Historique des commandes clients pour un article spécifique
+    // NOTE: Il y a une faute de frappe dans le nom de méthode "findHistoriaueCommandeClient"
     @Override
     public List<LigneCommandeClientDto> findHistoriaueCommandeClient(Integer idArticle) {
         return commandeClientRepository.findAllByArticleId(idArticle).stream()
@@ -118,6 +130,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .collect(Collectors.toList());
     }
 
+    // Historique des commandes fournisseurs pour un article spécifique
     @Override
     public List<LigneCommandeFournisseurDto> findHistoriqueCommandeFournisseur(Integer idArticle) {
         return commandeFournisseurRepository.findAllByArticleId(idArticle).stream()
@@ -125,6 +138,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .collect(Collectors.toList());
     }
 
+    // Recherche de tous les articles d'une catégorie spécifique
     @Override
     public List<ArticleDto> findAllArticleByIdCategory(Integer idCategory) {
         return articleRepository.findAllByCategoryId(idCategory).stream()
@@ -132,6 +146,8 @@ public class ArticleServiceImpl implements ArticleService {
                 .collect(Collectors.toList());
     }
 
+    // Suppression d'un article avec vérification des dépendances
+    // @Transactional assure que toutes les opérations sont atomiques
     @Override
     @Transactional
     public void delete(Integer id) {
@@ -140,12 +156,13 @@ public class ArticleServiceImpl implements ArticleService {
             return;
         }
 
-        // Vérifier si l'article existe
+        // Vérifier si l'article existe (lève une exception si non trouvé)
         findById(id);
 
         log.info("Tentative de suppression de l'article ID: {}", id);
 
         // Vérifier et supprimer les mouvements de stock en premier
+        // Les mouvements de stock sont supprimés silencieusement car ce sont des données techniques
         List<MvtStk> mouvementsStock = mvtStkRepository.findAllByArticleId(id);
         if (!mouvementsStock.isEmpty()) {
             log.info("Suppression de {} mouvements de stock pour l'article ID: {}", mouvementsStock.size(), id);
@@ -153,25 +170,29 @@ public class ArticleServiceImpl implements ArticleService {
             log.info("Mouvements de stock supprimés avec succès");
         }
 
-        // Vérifier les autres dépendances
+        // Vérifier les autres dépendances métier qui empêchent la suppression
+
+        // Vérification des commandes clients
         List<LigneCommandeClient> ligneCommandeClients = commandeClientRepository.findAllByArticleId(id);
         if (!ligneCommandeClients.isEmpty()) {
             throw new InvalidOperationException("Impossible de supprimer un article deja utilise dans des commandes client", ErrorCodes.ARTICLE_ALREADY_IN_USE);
         }
 
+        // Vérification des commandes fournisseurs
         List<LigneCommandeFournisseur> ligneCommandeFournisseurs = commandeFournisseurRepository.findAllByArticleId(id);
         if (!ligneCommandeFournisseurs.isEmpty()) {
             throw new InvalidOperationException("Impossible de supprimer un article deja utilise dans des commandes fournisseur",
                     ErrorCodes.ARTICLE_ALREADY_IN_USE);
         }
 
+        // Vérification des ventes
         List<LigneVente> ligneVentes = venteRepository.findAllByArticleId(id);
         if (!ligneVentes.isEmpty()) {
             throw new InvalidOperationException("Impossible de supprimer un article deja utilise dans des ventes",
                     ErrorCodes.ARTICLE_ALREADY_IN_USE);
         }
 
-        // Supprimer l'article
+        // Si aucune dépendance métier n'existe, suppression de l'article
         articleRepository.deleteById(id);
         log.info("Article ID: {} supprimé avec succès", id);
     }
