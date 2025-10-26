@@ -1,62 +1,28 @@
-# Fichier de configuration Spring Boot (application.yml)
-# Configuration des propriétés de l'application
-
-# Section principale de configuration Spring
 spring:
-  # Configuration de la source de données (base de données)
   datasource:
-    # URL de connexion à la base de données MySQL
     url: jdbc:mysql://localhost:3306/gestionstock?createDatabaseIfNotExist=true&useSSL=false&useUnicode=true&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    # Paramètres de l'URL:
-    # - createDatabaseIfNotExist=true: crée la base si elle n'existe pas
-    # - useSSL=false: désactive SSL pour la connexion
-    # - useUnicode=true: active le support Unicode
-    # - serverTimezone=UTC: définit le fuseau horaire du serveur
-    # - allowPublicKeyRetrieval=true: permet la récupération de la clé publique
-    
-    # Nom d'utilisateur pour la connexion MySQL
     username: root
-    # Mot de passe pour la connexion MySQL (vide dans cette configuration)
     password:
-    # Classe du driver JDBC pour MySQL
     driver-class-name: com.mysql.cj.jdbc.Driver
-  
-  # Configuration JPA (Java Persistence API) pour Hibernate
+
   jpa:
-    # Type de base de données utilisée
     database: MYSQL
-    # Afficher les requêtes SQL dans les logs (false = désactivé)
     show-sql: false
-    # Configuration Hibernate
     hibernate:
-      # Stratégie de génération du schéma de base de données:
-      # update = met à jour le schéma si nécessaire sans supprimer les données
       ddl-auto: update
-      # Dialecte SQL utilisé par Hibernate pour générer les requêtes spécifiques à MySQL
       dialect: org.hibernate.dialect.MySQLDialect
 
-# Configuration du serveur web intégré
 server:
-  # Port sur lequel le serveur va écouter (8081 au lieu du port par défaut 8080)
   port: 8081
 
-# Configuration des logs de l'application
 logging:
   level:
-    # Configuration des niveaux de log par package
-    org:
-      springframework:
-        # Active les logs de débogage pour Spring Security
-        security: DEBUG
+    com.saki.gestion_stock: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web.cors: DEBUG
 
-# Configuration de l'intégration avec l'API Flickr
-# (Les clés sont vides dans cette configuration)
 flickr:
-  # Clé API pour l'authentification Flickr
   apiKey: ""
-  # Secret API pour l'authentification Flickr
   apiSecret: ""
-  # Clé de l'application Flickr
   appKey: ""
-  # Secret de l'application Flickr
   appSecret: ""

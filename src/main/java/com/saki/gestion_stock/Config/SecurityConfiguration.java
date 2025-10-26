@@ -1,9 +1,6 @@
-// Déclaration du package pour la configuration de sécurité
 package com.saki.gestion_stock.Config;
 
-// Importations des classes nécessaires pour la sécurité Spring
 import com.saki.gestion_stock.services.auth.ApplicationUserDetailsService;
-import com.saki.gestion_stock.Config.ApplicationRequestFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,53 +15,36 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
-import java.util.Collections;
 
-// Activation de la sécurité Web Spring
 @EnableWebSecurity
-// Déclaration de cette classe comme configuration Spring
 @Configuration
 public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 
-    // Injection du service de détails utilisateur personnalisé
     @Autowired
     private ApplicationUserDetailsService applicationUserDetailsService;
 
-    // Injection du filtre JWT personnalisé
     @Autowired
     private ApplicationRequestFilter applicationRequestFilter;
 
-    // Configuration de l'authentification
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        // Configuration du service utilisateur personnalisé et de l'encodeur de mots de passe
         auth.userDetailsService(applicationUserDetailsService)
                 .passwordEncoder(passwordEncoder());
     }
 
-    // Configuration de la sécurité HTTP
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-                // Activation de la configuration CORS
-                .cors()
+                .cors().configurationSource(corsConfigurationSource())
                 .and()
-                // Désactivation de la protection CSRF (car API stateless + JWT)
                 .csrf().disable()
-                // Configuration des autorisations des requêtes
                 .authorizeRequests()
-                // Endpoints publics - accessibles sans authentification
-                .antMatchers(HttpMethod.POST, "/gestiondestock/v1/auth/authenticate").permitAll()
-                .antMatchers(HttpMethod.POST, "/gestiondestock/v1/entreprises/create").permitAll()
-                .antMatchers(HttpMethod.POST, "/gestiondestock/v1/articles/create").permitAll()
-                .antMatchers(HttpMethod.POST,"/gestiondestock/v1/commandesclients/**").permitAll()
-                .antMatchers(HttpMethod.POST,"/gestiondestock/v1/commandesfournisseurs/**").permitAll()
-
-                // Configuration des endpoints Swagger/OpenAPI - accessibles sans authentification
+                .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .antMatchers("/gestiondestock/v1/**").permitAll()
                 .antMatchers(
                         "/v2/api-docs",
                         "/swagger-resources",
@@ -76,46 +56,34 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                         "/v3/api-docs/**",
                         "/swagger-ui/**"
                 ).permitAll()
-                // Toutes les autres requêtes nécessitent une authentification
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()  // ⬅️ CHANGEMENT IMPORTANT ICI
                 .and()
-                // Configuration de la gestion des sessions en mode stateless (sans session)
                 .sessionManagement()
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS);
 
-        // Ajout du filtre JWT personnalisé avant le filtre d'authentification standard
         http.addFilterBefore(applicationRequestFilter, UsernamePasswordAuthenticationFilter.class);
     }
 
-    // Configuration CORS pour autoriser les requêtes cross-origin
     @Bean
-    public CorsFilter corsFilter() {
-        // Source de configuration basée sur les URLs
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // Configuration CORS
-        CorsConfiguration config = new CorsConfiguration();
-        // Autorisation des credentials (cookies, auth headers)
-        config.setAllowCredentials(true);
-        // Origines autorisées (Angular dev server)
-        config.setAllowedOrigins(Arrays.asList("http://localhost:4200", "http://127.0.0.1:4200"));
-        // Headers autorisés
-        config.setAllowedHeaders(Arrays.asList("Origin", "Content-Type", "Accept", "Authorization"));
-        // Méthodes HTTP autorisées
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        // Application de la configuration à tous les endpoints
-        source.registerCorsConfiguration("/**", config);
-        // Retour du filtre CORS configuré
-        return new CorsFilter(source);
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
-    // Exposition du AuthenticationManager en tant que bean pour injection
     @Bean
     @Override
     public AuthenticationManager authenticationManagerBean() throws Exception {
         return super.authenticationManagerBean();
     }
 
-    // Configuration de l'encodeur de mots de passe avec BCrypt
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
